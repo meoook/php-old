@@ -1,0 +1,154 @@
+UPDATE external_cdr SET id_dir=getdir(e_dst,id_prov);
+============================================================
+INSERT INTO external_cdr (date,id_prov,number,duration,call_cost)
+SELECT calldate,2,repl_8(dst),duration,call_cost FROM buff_wtc order by date;
+============================================================
+INSERT INTO external_cdr (date,id_prov,number,duration,call_cost)
+SELECT str_to_date(date_time,'%d/%m/%Y %H:%i:%s'),1,repl_8(dst),duration,call_cost FROM buff_mts order by date;
+============================================================
+
+awk -v OFS=',' '{FS=","}{print $5,$9,$30,$31,$56,$58}' aprell.txt > aprell_cut.txt
+
+LOAD DATA INFILE '/tmp/december.txt' INTO TABLE buff_sk
+FIELDS TERMINATED BY ','
+lines terminated by '\n'
+IGNORE 1 LINES;
+
+INSERT INTO internal_cdr (i_date,i_caller,i_calling,i_dst,i_duration,id_prov)
+SELECT 
+FROM_UNIXTIME(buff_sk.dateTimeOrigination),
+repl_8(buff_sk.callingPartyNumber),
+repl_8(buff_sk.originalCalledPartyNumber),
+repl_8(buff_sk.finalCalledPartyNumber),
+buff_sk.duration,
+device_history.id_prov
+FROM buff_sk LEFT JOIN device_history on device_history.device_name=buff_sk.destDeviceName and FROM_UNIXTIME(buff_sk.dateTimeOrigination) between device_history.date_on and device_history.date_off;
+============================================================
+delimiter //
+CREATE FUNCTION getDir (numm CHAR(20), prov INT) RETURNS INT
+BEGIN
+DECLARE lenm INT(1) DEFAULT 9;
+DECLARE result INT DEFAULT null;
+REPEAT
+IF LENGTH(numm)<5
+THEN SET lenm = 0;
+ELSEIF LEFT(numm,lenm) IN (SELECT code FROM directions WHERE id_prov=prov and LENGTH(code)=lenm)
+THEN SELECT id_dir INTO result FROM directions WHERE id_prov=prov and code = LEFT(numm,lenm);
+SET lenm = 0;
+ELSE SET lenm=lenm-1;
+SET result=null;
+END IF;
+UNTIL lenm<1
+END REPEAT;
+RETURN result;
+END
+//
+delimiter ;
+============================================================
+delimiter //
+CREATE FUNCTION getPrice(numb CHAR(20),prov INT) RETURNS decimal(4,2)
+BEGIN
+DECLARE pricc DECIMAL(4,2) DEFAULT 0.0;
+DECLARE iddir INT DEFAULT null;
+SELECT getDir(numb,prov) INTO iddir;
+SELECT price INTO pricc from directions where id_dir=iddir;
+RETURN pricc;
+END
+//
+delimiter ;
+============================================================
+delimiter //
+CREATE FUNCTION repl_8 (numb char(20)) RETURNS char(20) CHARSET utf8
+BEGIN
+DECLARE result char(20) default '';
+IF LEFT(numb,3)='810' AND LENGTH(numb)>4 THEN SET result=substring(numb,4);
+ELSEIF LENGTH(numb)>4 AND LEFT(numb,1)='8' THEN SET result=concat('7',substring(numb,2));
+ELSEIF LENGTH(numb)>4 AND LEFT(numb,1)='+' THEN SET result=substring(numb,2);
+ELSE SET result=numb;
+END IF;
+RETURN result;
+END
+//
+delimiter ;
+============================================================
+SELECT fill_cross(id_int) FROM internal_cdr;
+
+delimiter //
+CREATE FUNCTION fill_cross (idd INT) RETURNS INT
+BEGIN
+DECLARE check_prov INT DEFAULT 0;
+DECLARE bill_dur INT DEFAULT 0;
+DECLARE nn INT DEFAULT 0;
+DECLARE mm INT DEFAULT 1;
+DECLARE ii_dst CHAR(20) DEFAULT '';
+DECLARE ii_duration INT DEFAULT 0;
+DECLARE result INT DEFAULT 0;
+
+SELECT id_prov INTO check_prov FROM internal_cdr WHERE id_int=idd;
+IF check_prov is not null
+THEN 
+SET result=idd;
+SELECT count(*) INTO nn FROM providers;
+SELECT i_dst INTO ii_dst FROM internal_cdr WHERE id_int=idd;
+SELECT i_duration INTO ii_duration FROM internal_cdr WHERE id_int=idd;
+
+REPEAT
+SELECT free_secs INTO bill_dur FROM providers WHERE id_prov=mm;
+  IF ii_duration>bill_dur
+  THEN SET bill_dur=CEILING(ii_duration/60)*60;
+  ELSE SET bill_dur=0;
+  END IF;
+INSERT INTO cross_int_dir (id_int,id_dir,billing_duration) VALUES (idd,getDir(ii_dst,mm),bill_dur);
+
+SET mm=mm+1;
+UNTIL mm>nn
+END REPEAT;
+END IF;
+RETURN result;
+END
+//
+delimiter ;
+
+# Проверка для работающих провайдеров (не стоит - функцию сильно менять надо будет)
+date_off>curr_date
+============================================================
+update external_cdr set id_int=getid_int(id_ext) WHERE id_int is null and e_date>'2013-04-01 00:00:01';
+
+delimiter //
+CREATE FUNCTION getID_int (idd INT) RETURNS INT
+BEGIN
+DECLARE ddate INT DEFAULT '0';
+DECLARE ddst CHAR(20) default '';
+DECLARE dduration INT(5) default 0;
+DECLARE iid_prov INT(2) default 0;
+DECLARE nn INT default 0;
+DECLARE result INT(8) default NULL;
+
+SELECT UNIX_TIMESTAMP(e_date) INTO ddate FROM external_cdr WHERE id_ext=idd;
+SELECT e_dst INTO ddst FROM external_cdr WHERE id_ext=idd;
+SELECT e_duration INTO dduration FROM external_cdr WHERE id_ext=idd;
+SELECT id_prov INTO iid_prov FROM external_cdr WHERE id_ext=idd;
+
+DELETE FROM counting_tmp;
+INSERT INTO counting_tmp (id_int,c_date,dst,duration,id_prov) SELECT id_int,i_date,i_dst,i_duration,id_prov FROM internal_cdr WHERE UNIX_TIMESTAMP(i_date) BETWEEN (ddate-3600) AND (ddate+3600) AND i_dst=ddst AND id_prov=iid_prov and id_ext is null;
+
+SELECT COUNT(*) INTO nn FROM counting_tmp;
+  IF nn=0
+  THEN SET result=null;
+  ELSEIF nn=1
+  THEN SELECT id_int INTO result FROM counting_tmp;
+      UPDATE internal_cdr SET id_ext=idd where id_int=result;
+  ELSE
+      SELECT MIN(ABS(ddate-UNIX_TIMESTAMP(c_date))) INTO nn FROM counting_tmp limit 1;
+      SELECT id_int INTO result FROM counting_tmp WHERE CEILING(duration/60)*60=dduration and ABS(ddate-UNIX_TIMESTAMP(c_date))=nn limit 1;
+      UPDATE internal_cdr SET id_ext=idd where id_int=result;
+  END IF;
+RETURN result;
+END
+//
+delimiter ;
+
+
+
+alter table cross_int_dir add foreign key (id_int) references directions(id_int) ON UPDATE CASCADE ON DELETE RESTRICT;
+ALTER TABLE cross_int_dir add unique index tmp(id_int,id_dir);

@@ -1,0 +1,13 @@
+delimiter $$
+CREATE FUNCTION id2login(id INT) RETURNS VARCHAR(50)
+BEGIN
+DECLARE result VARCHAR(50) default '';
+SELECT login INTO result from users where uid=id;
+RETURN result;
+END
+$$
+delimiter ;
+
+
+
+SELECT id2login(1);

@@ -1,0 +1,340 @@
+for whom this prog ? adm or users who will use ? first of all ?
+Поле end trigger = what for
+carma on user or task ? or when u whish onclick? range ?
+rules to edit-
+
+
+
+
+CONSTRAINT `fk_1` FOREIGN KEY (`id1`) REFERENCES `tbl1` (`id`) ON DELETE CASCADE,
+
+
+
+select direction,id_dir, code from directions where id_dir in (4725,96,2572,818,304,815,174,814,813,816,811,812,817,810);
+
+
+
+SELECT getdir(i_dst,id_prov), count(*), sum(CEILING(i_duration/60)), sum(getPrice(i_dst,id_prov)*CEILING(i_duration/60)) from internal_cdr  where id_prov=1 and i_duration>=5 and i_date>'2014-01-01 00:00:00' group by getdir(i_dst,id_prov) order by sum(getPrice(i_dst,id_prov)*CEILING(i_duration/60));
+
+
+select sum(getPrice(i_dst,1)*CEILING(i_duration/60)) from internal_cdr where id_prov=2 and i_date>'2013-05-31 23:59:59' and i_date<'2013-06-30 23:59:59' and left(i_dst,4) not in (7495,7499,7498,7496,7497);
+
+
+
+select getcode(number,1),count(*) as count, min(rur*60/duration) as min_price, max(rur*60/duration) as max_price, avg(rur*60/duration) as avg_price from internal_cdr where calldate>'2014-01-31 23:59:59' group by getcode(number,1);
+
+
+select * from sk where getCode(fix_redirect,1)='-' and length(fix_redirect)>4; - выдает номерау которых не найден код и длинна номера >4
+select * from direction_price where price is null; -  у кого нет цены
+Проверка на +7...
+Укоротить название Великобритания
+Что делать с номерами 009 09 и тп
+3.1	Доступ к платным справочно-информационным и заказным услугам связи:
+•	По номеру	00-9							195,00 за минуту
+•	По номеру	09							45,00 за минуту
+•	По номерам:	980-5033, 933-3679, 933-3666, 933-3672	120,00 за минуту
+•	По номеру 	940-1177						190,00 за минуту
+•	По номерам:	777-9777, 929-9009, 777-1234, 777-0202	180,00 за минуту
+•	По номерам 	264-9877, 264-6469				100,00 за минуту
+•	По номерам:	514-0584, 363-2037, 789-8002, 543-9182,
+			543-9183, 543-9184, 789-6526			130,00 за минуту
+•	По номеру	729-3818						255,00 за 15 минут
+										непрерывного разговора
+CEILING(sk.duration/60)*60
+
+select wtc.calldate, sk.call_start, wtc.dst, wtc.duration, sk.duration from wtc inner join sk on ABS(unix_timestamp(wtc.calldate)-sk.call_start)<4 and wtc.dst=sk.redirect and wtc.duration=CEILING(sk.duration/60)*60 where wtc.calldate>'2013-01-31 23:59:59';
+
+ALTER DATABASE database CHARACTER SET utf8 COLLATE utf8_general_ci;
+TRUNCATE TABLE sk;
+Не удобно если конечный номер пустой - лучше наоборот
+============================================================
+С сервачка
+c:\Program Files (x86)\putty>pscp -P 22 root@10.1.32.24:/etc/december.txt c:\tmp\december.txt
+На сервачек
+c:\Program Files (x86)\putty>pscp -P 22 C:\Users\a.bazhanov\Downloads\tel\cucm_01.15.txt root@10.1.32.24:/tmp/cucm_01.15.txt
+Отчет
+SELECT count(*) FROM internal_cdr where i_calling=2099 and i_date between '2014-01-01 00:00:00' and '2014-01-31 23:59:59';
+
+
+
+
+source /tmp/CODES.TXT
+
+mysqldump -u meok -p  asterisk >'/tmp/astr.sql'
+mysql-u username -p database < backup-file.sql
+
+mysqladmin proc — показывает список запросов, которые выполняются в данный момент SQL сервером, с текстом запроса, с его идентификатором, и время выполнения запроса.
+
+mysqladmin kill id-процесса позволяет прекратить выполнение запро­са с данным ID
+
+SELECT count(*) FROM internal_cdr where i_calling=2099 and i_date between '2013-03-15 06:06:40' and '2013-03-15 06:06:40';
+============================================================
+LOAD DATA INFILE '/tmp/december.txt' INTO TABLE buff_sk
+FIELDS TERMINATED BY ','
+lines terminated by '\n'
+IGNORE 1 LINES;
+============================================================
+INSERT INTO internal_cdr SELECT 
+CONVERT(dateTimeOrigination,SIGNED),
+callingPartyNumber,
+repl_8(callingPartyNumber),
+originalCalledPartyNumber,
+repl_8(originalCalledPartyNumber),
+finalCalledPartyNumber,
+repl_8(finalCalledPartyNumber),
+CONVERT(dateTimeConnect,SIGNED),
+CONVERT(dateTimeDisconnect,SIGNED),
+CONVERT(duration,SIGNED),
+destCause_value FROM detal_all order by dateTimeOrigination;
+============================================================
+delimiter //
+CREATE FUNCTION repl_8 (numb char(20)) RETURNS char(20) CHARSET utf8
+BEGIN
+DECLARE result char(20) default '';
+IF LEFT(numb,3)='810' and LENGTH(numb)>4 THEN SET result=substring(numb,4);
+ELSEIF LENGTH(numb)>4 AND LEFT(numb,1) in ('0','1','2','3','4','5','6','7','8','9') THEN SET result=concat('7',substring(numb,2));
+ELSE SET result=numb;
+END IF;
+RETURN result;
+END
+//
+delimiter ;
+============================================================
+select *, getcost(fix_redirect, duration,'1') as Cost from sk limit 1;
+select *, getPrice(getCode(fix_redirect,'1'),'1') as Price, getcost(fix_redirect, duration,'1') as Cost from sk limit 20;
+============================================================
+delimiter //
+CREATE FUNCTION getPrice(numb CHAR(20),prov CHAR(2)) RETURNS decimal(4,2)
+BEGIN
+DECLARE pricc DECIMAL(4,2) DEFAULT 0.0;
+DECLARE codd CHAR(9) DEFAULT '-';
+SELECT getDir(numb,prov) INTO codd;
+SELECT price INTO pricc from direction_price where provider=prov and code=codd;
+RETURN pricc;
+END
+//
+delimiter ;
+============================================================
+delimiter //
+CREATE FUNCTION getCost(numbb CHAR(15), durr INT(5), prov char(2)) RETURNS decimal(8,2)
+BEGIN
+DECLARE result DECIMAL(8,2) DEFAULT 0.0;
+IF durr>3
+THEN SET result=CEILING(durr/60)*getPrice(getCode(numbb,prov),prov);
+ELSE
+SET result=0.0;
+END IF;
+RETURN result;
+END
+//
+delimiter ;
+============================================================
+delimiter //
+CREATE FUNCTION getCode (numm CHAR(15), prov char(2)) RETURNS CHAR(9) CHARSET utf8
+BEGIN
+DECLARE lenm INT(1) DEFAULT 9;
+DECLARE result CHAR(9) DEFAULT '-';
+REPEAT
+IF LENGTH(numm)<5
+THEN SET lenm = 0;
+ELSEIF LEFT(numm,lenm) IN (SELECT code FROM direction_price WHERE provider=prov and LENGTH(code)=lenm)
+THEN SET result = LEFT(numm,lenm);
+SET lenm = 0;
+ELSE SET lenm=lenm-1;
+END IF;
+UNTIL lenm<1
+END REPEAT;
+RETURN result;
+END
+//
+delimiter ;
+============================================================
+delimiter //
+CREATE TRIGGER `repl_8` BEFORE INSERT ON wtc
+FOR EACH ROW 
+BEGIN
+IF LEFT(NEW.dst,3)='810'
+THEN
+SET NEW.number=substring(NEW.dst,4);
+ELSE
+SET NEW.number=concat('7',substring(NEW.dst,2));
+END IF;
+END
+//
+delimiter ;
+============================================================
+
+insert into direction_codes (name, code) values('Россия','7');
+
+#set names cp1251;
+#set names koi8r;
+#set names utf8;
+#SET NAMES cp866
+
+SHOW VARIABLES LIKE 'character_set_client';
+show variables like 'character_set_database';
+show variables like 'character_set_server';
+
+
+#mysqli_client_encoding()
+
+SET NAMES cp1251;
+SET character_set_database=cp1251;
+SET character_set_server=cp1251;
+
+============================================================
+CREATE TABLE direction_price (
+code CHAR(9),
+direction VARCHAR(254),
+provider VARCHAR(2),
+price DECIMAL(4,2),
+zone CHAR(2))
+CHARACTER SET utf8
+;
+
+INSERT INTO direction_price (code, direction) SELECT code,name from direction_codes;
+
+update direction_price set provider='1' where code<>'';
+
+============================================================
+call_start INT(10),  // UNIQUE - стоит ли ?
+
+CREATE TABLE sk (
+call_start INT(10),  // UNIQUE - стоит ли ? 
+callerID VARCHAR(254),
+fix_callerID VARCHAR(254),
+dialed VARCHAR(254),
+fix_dialed VARCHAR(254),
+redirect VARCHAR(254),
+fix_redirect VARCHAR(254),
+connect_start INT(10),
+connect_end INT(10),
+duration INT(5),
+status VARCHAR(10))
+CHARACTER SET utf8;
+
+============================================================
+create table counting_tmp (
+id_int INT(8),
+date DATETIME,
+dst VARCHAR(20),
+duration INT(4),
+prov_id INT(2),
+call_cost DECIMAL(7,2))
+CHARACTER SET utf8;
+
+alter table directions add foreign key (id_prov) references providers(id_prov) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+ALTER TABLE trunk_history ADD FOREIGN KEY (id_prov) REFERENCES providers(id_prov) ON UPDATE CASCADE ON DELETE RESTRICT;
+
+create table detal_all (
+cdrRecordType varchar(254),
+globalCallID_callManagerId varchar(254),
+globalCallID_callId varchar(254),
+origLegCallIdentifier varchar(254),
+dateTimeOrigination varchar(10),
+origNodeId varchar(254),
+origSpan varchar(254),
+origIpAddr varchar(254),
+callingPartyNumber varchar(254),
+callingPartyUnicodeLoginUserID varchar(254),
+origCause_location varchar(254),
+origCause_value varchar(254),
+origPrecedenceLevel varchar(254),
+origMediaTransportAddress_IP varchar(254),
+origMediaTransportAddress_Port varchar(254),
+origMediaCap_payloadCapability varchar(254),
+origMediaCap_maxFramesPerPacket varchar(254),
+origMediaCap_g723BitRate varchar(254),
+origVideoCap_Codec varchar(254),
+origVideoCap_Bandwidth varchar(254),
+origVideoCap_Resolution varchar(254),
+origVideoTransportAddress_IP varchar(254),
+origVideoTransportAddress_Port varchar(254),
+origRSVPAudioStat varchar(254),
+origRSVPVideoStat varchar(254),
+destLegIdentifier varchar(254),
+destNodeId varchar(254),
+destSpan varchar(254),
+destIpAddr varchar(254),
+originalCalledPartyNumber varchar(254),
+finalCalledPartyNumber varchar(254),
+finalCalledPartyUnicodeLoginUserID varchar(254),
+destCause_location varchar(254),
+destCause_value varchar(254),
+destPrecedenceLevel varchar(254),
+destMediaTransportAddress_IP varchar(254),
+destMediaTransportAddress_Port varchar(254),
+destMediaCap_payloadCapability varchar(254),
+destMediaCap_maxFramesPerPacket varchar(254),
+destMediaCap_g723BitRate varchar(254),
+destVideoCap_Codec varchar(254),
+destVideoCap_Bandwidth varchar(254),
+destVideoCap_Resolution varchar(254),
+destVideoTransportAddress_IP varchar(254),
+destVideoTransportAddress_Port varchar(254),
+destRSVPAudioStat varchar(254),
+destRSVPVideoStat varchar(254),
+dateTimeConnect varchar(10),
+dateTimeDisconnect varchar(10),
+lastRedirectDn varchar(254),
+pkid varchar(254),
+originalCalledPartyNumberPartition varchar(254),
+callingPartyNumberPartition varchar(254),
+finalCalledPartyNumberPartition varchar(254),
+lastRedirectDnPartition varchar(254),
+duration varchar(5),
+origDeviceName varchar(254),
+destDeviceName varchar(254),
+origCallTerminationOnBehalfOf varchar(254),
+destCallTerminationOnBehalfOf varchar(254),
+origCalledPartyRedirectOnBehalfOf varchar(254),
+lastRedirectRedirectOnBehalfOf varchar(254),
+origCalledPartyRedirectReason varchar(254),
+lastRedirectRedirectReason varchar(254),
+destConversationId varchar(254),
+globalCallId_ClusterID varchar(254),
+joinOnBehalfOf varchar(254),
+comment varchar(254),
+authCodeDescription varchar(254),
+authorizationLevel varchar(254),
+clientMatterCode varchar(254),
+origDTMFMethod varchar(254),
+destDTMFMethod varchar(254),
+callSecuredStatus varchar(254),
+origConversationId varchar(254),
+origMediaCap_Bandwidth varchar(254),
+destMediaCap_Bandwidth varchar(254),
+authorizationCodeValue varchar(254),
+outpulsedCallingPartyNumber varchar(254),
+outpulsedCalledPartyNumber varchar(254),
+origIpv4v6Addr varchar(254),
+destIpv4v6Addr varchar(254),
+origVideoCap_Codec_Channel2 varchar(254),
+origVideoCap_Bandwidth_Channel2 varchar(254),
+origVideoCap_Resolution_Channel2 varchar(254),
+origVideoTransportAddress_IP_Channel2 varchar(254),
+origVideoTransportAddress_Port_Channel2 varchar(254),
+origVideoChannel_Role_Channel2 varchar(254),
+destVideoCap_Codec_Channel2 varchar(254),
+destVideoCap_Bandwidth_Channel2 varchar(254),
+destVideoCap_Resolution_Channel2 varchar(254),
+destVideoTransportAddress_IP_Channel2 varchar(254),
+destVideoTransportAddress_Port_Channel2 varchar(254),
+destVideoChannel_Role_Channel2 varchar(254),
+incomingProtocolID varchar(254),
+incomingProtocolCallRef varchar(254),
+outgoingProtocolID varchar(254),
+outgoingProtocolCallRef varchar(254),
+currentRoutingReason varchar(254),
+origRoutingReason varchar(254),
+lastRedirectingRoutingReason varchar(254),
+huntPilotDN varchar(254),
+huntPilotPartition varchar(254),
+calledPartyPatternUsage varchar(254),
+outpulsedOriginalCalledPartyNumber varchar(254),
+outpulsedLastRedirectingNumber varchar(254))
+CHARACTER SET utf8;
+
+
+
